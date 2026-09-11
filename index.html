@@ -1,0 +1,505 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
+<title>Portal de Clientes - Consultora Maldonado</title>
+<style>
+  :root {
+    --cm-bg: #0f172a;
+    --cm-accent: #2563eb;
+    --cm-accent-light: #60a5fa;
+    --cm-text: #e2e8f0;
+    --cm-muted: #94a3b8;
+    --cm-danger: #ef4444;
+    --cm-surface: #1e293b;
+  }
+
+  * {
+    box-sizing: border-box;
+  }
+
+  html, body {
+    margin: 0;
+    padding: 0;
+    width: 100%;
+    height: 100%;
+    background: var(--cm-bg);
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+    overflow: hidden;
+  }
+
+  #app-iframe {
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    border: none;
+    background: #ffffff;
+    z-index: 1;
+    display: none;
+  }
+
+  /* ---------------- Pantalla de carga ---------------- */
+  #loader-screen {
+    position: fixed;
+    inset: 0;
+    z-index: 10;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 24px;
+    background: radial-gradient(circle at 50% 30%, #1e3a5f 0%, var(--cm-bg) 70%);
+    color: var(--cm-text);
+    text-align: center;
+    padding: 24px;
+  }
+
+  .cm-logo {
+    font-size: 22px;
+    font-weight: 700;
+    letter-spacing: 0.5px;
+    color: var(--cm-text);
+  }
+
+  .cm-logo span {
+    color: var(--cm-accent-light);
+  }
+
+  .spinner {
+    width: 56px;
+    height: 56px;
+    border-radius: 50%;
+    border: 4px solid rgba(148, 163, 184, 0.25);
+    border-top-color: var(--cm-accent-light);
+    animation: cm-spin 0.9s linear infinite;
+  }
+
+  @keyframes cm-spin {
+    to { transform: rotate(360deg); }
+  }
+
+  #loader-status {
+    font-size: 15px;
+    color: var(--cm-muted);
+    max-width: 340px;
+    line-height: 1.5;
+    min-height: 22px;
+  }
+
+  #loader-progress-bar {
+    width: 260px;
+    height: 4px;
+    background: rgba(148, 163, 184, 0.2);
+    border-radius: 2px;
+    overflow: hidden;
+  }
+
+  #loader-progress-fill {
+    height: 100%;
+    width: 15%;
+    background: linear-gradient(90deg, var(--cm-accent), var(--cm-accent-light));
+    border-radius: 2px;
+    transition: width 0.6s ease;
+  }
+
+  /* ---------------- Estado de error ---------------- */
+  #error-box {
+    display: none;
+    flex-direction: column;
+    align-items: center;
+    gap: 14px;
+    background: var(--cm-surface);
+    border: 1px solid rgba(239, 68, 68, 0.4);
+    border-radius: 12px;
+    padding: 20px 24px;
+    max-width: 380px;
+  }
+
+  #error-box p {
+    margin: 0;
+    color: var(--cm-text);
+    font-size: 14px;
+    line-height: 1.5;
+  }
+
+  .cm-btn {
+    appearance: none;
+    border: none;
+    border-radius: 8px;
+    padding: 10px 22px;
+    font-size: 14px;
+    font-weight: 600;
+    cursor: pointer;
+    transition: opacity 0.15s ease, transform 0.1s ease;
+  }
+
+  .cm-btn:active {
+    transform: scale(0.97);
+  }
+
+  .cm-btn-primary {
+    background: var(--cm-accent);
+    color: #ffffff;
+  }
+
+  .cm-btn-primary:hover {
+    opacity: 0.9;
+  }
+
+  /* ---------------- Modal de sesión finalizada ---------------- */
+  #session-modal-overlay {
+    position: fixed;
+    inset: 0;
+    z-index: 20;
+    display: none;
+    align-items: center;
+    justify-content: center;
+    background: rgba(2, 6, 23, 0.85);
+    backdrop-filter: blur(3px);
+  }
+
+  #session-modal {
+    background: var(--cm-surface);
+    border-radius: 14px;
+    padding: 32px 28px;
+    max-width: 380px;
+    width: calc(100% - 40px);
+    text-align: center;
+    box-shadow: 0 20px 60px rgba(0, 0, 0, 0.5);
+    border: 1px solid rgba(148, 163, 184, 0.15);
+  }
+
+  #session-modal .icon-circle {
+    width: 56px;
+    height: 56px;
+    margin: 0 auto 16px;
+    border-radius: 50%;
+    background: rgba(239, 68, 68, 0.12);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 26px;
+  }
+
+  #session-modal h2 {
+    color: var(--cm-text);
+    font-size: 18px;
+    margin: 0 0 10px;
+  }
+
+  #session-modal p {
+    color: var(--cm-muted);
+    font-size: 14px;
+    line-height: 1.6;
+    margin: 0 0 22px;
+  }
+</style>
+</head>
+<body>
+
+  <iframe id="app-iframe" title="Aplicación Consultora Maldonado" allow="clipboard-read; clipboard-write"></iframe>
+
+  <div id="loader-screen">
+    <div class="cm-logo">Consultora <span>Maldonado</span></div>
+    <div class="spinner" id="spinner-el"></div>
+    <div id="loader-status">Preparando el sistema...</div>
+    <div id="loader-progress-bar"><div id="loader-progress-fill"></div></div>
+
+    <div id="error-box">
+      <p id="error-message">Ha ocurrido un error al iniciar el sistema.</p>
+      <button class="cm-btn cm-btn-primary" id="retry-button">Reintentar</button>
+    </div>
+  </div>
+
+  <div id="session-modal-overlay">
+    <div id="session-modal">
+      <div class="icon-circle">⏻</div>
+      <h2 id="modal-title">Sesión finalizada</h2>
+      <p id="modal-message">Tu sesión ha finalizado por seguridad.</p>
+      <button class="cm-btn cm-btn-primary" id="modal-restart-button">Iniciar nueva sesión</button>
+    </div>
+  </div>
+
+<script>
+(function () {
+  "use strict";
+
+  // =========================================================================
+  // CONFIGURACIÓN — editar antes de publicar
+  // =========================================================================
+  const CONFIG = {
+    // URL base del Cloudflare Worker desplegado (SIN barra final)
+    WORKER_URL: "https://PENDIENTE-DE-DESPLEGAR.workers.dev",
+
+    // Intervalo entre cada consulta de estado al Worker (ms)
+    POLL_INTERVAL_MS: 3000,
+
+    // Tiempo máximo total de espera antes de mostrar error (ms)
+    MAX_WAIT_MS: 120000,
+
+    // Inactividad del usuario (sin mover el mouse / teclado / tocar pantalla)
+    INACTIVITY_LIMIT_MS: 5 * 60 * 1000,
+
+    // Límite estricto de duración de sesión, independiente de la actividad
+    SESSION_LIMIT_MS: 25 * 60 * 1000,
+
+    // Frecuencia con la que se verifica, en segundo plano, que el Codespace
+    // siga disponible mientras el usuario ya está usando la app
+    HEALTH_CHECK_INTERVAL_MS: 60 * 1000,
+  };
+
+  // =========================================================================
+  // Referencias al DOM
+  // =========================================================================
+  const iframeEl = document.getElementById("app-iframe");
+  const loaderScreen = document.getElementById("loader-screen");
+  const loaderStatus = document.getElementById("loader-status");
+  const loaderProgressFill = document.getElementById("loader-progress-fill");
+  const spinnerEl = document.getElementById("spinner-el");
+  const errorBox = document.getElementById("error-box");
+  const errorMessage = document.getElementById("error-message");
+  const retryButton = document.getElementById("retry-button");
+
+  const modalOverlay = document.getElementById("session-modal-overlay");
+  const modalTitle = document.getElementById("modal-title");
+  const modalMessage = document.getElementById("modal-message");
+  const modalRestartButton = document.getElementById("modal-restart-button");
+
+  // =========================================================================
+  // Estado interno
+  // =========================================================================
+  let pollTimeoutId = null;
+  let inactivityTimeoutId = null;
+  let sessionTimeoutId = null;
+  let healthCheckIntervalId = null;
+  let pollStartedAt = 0;
+  let sessionActive = false;
+
+  const ACTIVITY_EVENTS = ["mousemove", "mousedown", "keydown", "touchstart", "scroll", "wheel"];
+
+  // =========================================================================
+  // Utilidades de UI
+  // =========================================================================
+  function setLoaderMessage(text, progressPercent) {
+    loaderStatus.textContent = text;
+    if (typeof progressPercent === "number") {
+      loaderProgressFill.style.width = Math.min(progressPercent, 100) + "%";
+    }
+  }
+
+  function showLoader() {
+    loaderScreen.style.display = "flex";
+    spinnerEl.style.display = "block";
+    errorBox.style.display = "none";
+    iframeEl.style.display = "none";
+  }
+
+  function showError(message) {
+    spinnerEl.style.display = "none";
+    errorMessage.textContent = message;
+    errorBox.style.display = "flex";
+    setLoaderMessage("No se pudo iniciar el sistema.");
+  }
+
+  function showApp(appUrl) {
+    loaderScreen.style.display = "none";
+    iframeEl.src = appUrl;
+    iframeEl.style.display = "block";
+  }
+
+  function showSessionModal(title, message) {
+    modalTitle.textContent = title;
+    modalMessage.textContent = message;
+    modalOverlay.style.display = "flex";
+  }
+
+  function hideSessionModal() {
+    modalOverlay.style.display = "none";
+  }
+
+  // =========================================================================
+  // Llamadas al Worker
+  // =========================================================================
+  async function requestWake() {
+    const res = await fetch(CONFIG.WORKER_URL + "/wake", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+    });
+    const data = await res.json().catch(() => ({}));
+    if (!res.ok || !data.success) {
+      throw new Error(data.error || ("El Worker respondió con error " + res.status));
+    }
+    return data;
+  }
+
+  async function requestStatus() {
+    const res = await fetch(CONFIG.WORKER_URL + "/status?_=" + Date.now(), {
+      method: "GET",
+    });
+    const data = await res.json().catch(() => ({}));
+    if (!res.ok || !data.success) {
+      throw new Error(data.error || ("El Worker respondió con error " + res.status));
+    }
+    return data;
+  }
+
+  function messageForState(state) {
+    switch (state) {
+      case "Starting":
+        return "Encendiendo el entorno del cliente...";
+      case "Provisioning":
+        return "Aprovisionando recursos...";
+      case "Awaiting":
+        return "Esperando confirmación de arranque...";
+      case "WaitingForApplicationPort":
+        return "El sistema está casi listo, verificando la aplicación...";
+      case "Unavailable":
+      case "Failed":
+        return "El entorno reportó un problema al iniciar.";
+      default:
+        return "Iniciando sistema...";
+    }
+  }
+
+  // =========================================================================
+  // Flujo de arranque (cold start)
+  // =========================================================================
+  async function beginColdStart() {
+    showLoader();
+    setLoaderMessage("Iniciando sistema...", 10);
+    pollStartedAt = Date.now();
+
+    try {
+      await requestWake();
+      setLoaderMessage("Solicitud de arranque enviada...", 25);
+      schedulePoll();
+    } catch (err) {
+      showError(
+        "No se pudo contactar con el servicio de arranque. " +
+        (err && err.message ? err.message : "")
+      );
+    }
+  }
+
+  function schedulePoll() {
+    if (pollTimeoutId) clearTimeout(pollTimeoutId);
+    pollTimeoutId = setTimeout(pollOnce, CONFIG.POLL_INTERVAL_MS);
+  }
+
+  async function pollOnce() {
+    const elapsed = Date.now() - pollStartedAt;
+    if (elapsed > CONFIG.MAX_WAIT_MS) {
+      showError(
+        "El sistema está tardando más de lo esperado en iniciar. Por favor, inténtalo nuevamente."
+      );
+      return;
+    }
+
+    try {
+      const data = await requestStatus();
+      const progress = 25 + Math.min(65, Math.floor((elapsed / CONFIG.MAX_WAIT_MS) * 65));
+
+      if (data.ready && data.url) {
+        setLoaderMessage("¡Listo! Cargando el portal...", 100);
+        startSession(data.url);
+        return;
+      }
+
+      setLoaderMessage(messageForState(data.state), progress);
+      schedulePoll();
+    } catch (err) {
+      showError(
+        "Ocurrió un error al verificar el estado del sistema. " +
+        (err && err.message ? err.message : "")
+      );
+    }
+  }
+
+  // =========================================================================
+  // Gestión de sesión activa (inactividad, límite duro, health-check)
+  // =========================================================================
+  function startSession(appUrl) {
+    sessionActive = true;
+    showApp(appUrl);
+    hideSessionModal();
+
+    resetInactivityTimer();
+    ACTIVITY_EVENTS.forEach((evt) =>
+      window.addEventListener(evt, resetInactivityTimer, { passive: true })
+    );
+
+    sessionTimeoutId = setTimeout(function () {
+      endSession(
+        "Límite de sesión alcanzado",
+        "Por seguridad, esta sesión ha llegado a su tiempo máximo de 25 minutos. Vuelve a iniciar sesión para continuar."
+      );
+    }, CONFIG.SESSION_LIMIT_MS);
+
+    healthCheckIntervalId = setInterval(runBackgroundHealthCheck, CONFIG.HEALTH_CHECK_INTERVAL_MS);
+  }
+
+  function resetInactivityTimer() {
+    if (!sessionActive) return;
+    if (inactivityTimeoutId) clearTimeout(inactivityTimeoutId);
+    inactivityTimeoutId = setTimeout(function () {
+      endSession(
+        "Sesión cerrada por inactividad",
+        "No se detectó actividad durante 5 minutos, así que la sesión se cerró automáticamente por seguridad."
+      );
+    }, CONFIG.INACTIVITY_LIMIT_MS);
+  }
+
+  async function runBackgroundHealthCheck() {
+    if (!sessionActive) return;
+    try {
+      const data = await requestStatus();
+      if (!data.ready) {
+        endSession(
+          "Conexión perdida",
+          "El entorno del cliente dejó de estar disponible. Por favor, inicia una nueva sesión."
+        );
+      }
+    } catch {
+      endSession(
+        "Conexión perdida",
+        "No fue posible confirmar que el sistema siga activo. Por favor, inicia una nueva sesión."
+      );
+    }
+  }
+
+  function endSession(title, message) {
+    if (!sessionActive) return;
+    sessionActive = false;
+
+    ACTIVITY_EVENTS.forEach((evt) => window.removeEventListener(evt, resetInactivityTimer));
+    if (inactivityTimeoutId) clearTimeout(inactivityTimeoutId);
+    if (sessionTimeoutId) clearTimeout(sessionTimeoutId);
+    if (healthCheckIntervalId) clearInterval(healthCheckIntervalId);
+    if (pollTimeoutId) clearTimeout(pollTimeoutId);
+
+    iframeEl.src = "about:blank";
+    iframeEl.style.display = "none";
+
+    showSessionModal(title, message);
+  }
+
+  // =========================================================================
+  // Listeners de botones
+  // =========================================================================
+  retryButton.addEventListener("click", beginColdStart);
+  modalRestartButton.addEventListener("click", function () {
+    window.location.reload();
+  });
+
+  // =========================================================================
+  // Arranque inicial
+  // =========================================================================
+  beginColdStart();
+})();
+</script>
+
+</body>
+</html>
