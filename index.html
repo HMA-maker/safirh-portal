@@ -324,7 +324,7 @@
   // Llamadas al Worker
   // =========================================================================
   async function requestWake() {
-    const res = await fetch(CONFIG.WORKER_URL + "/wake", {
+    const res = await fetch(CONFIG.WORKER_URL + "/_control/wake", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
     });
@@ -336,7 +336,7 @@
   }
 
   async function requestStatus() {
-    const res = await fetch(CONFIG.WORKER_URL + "/status?_=" + Date.now(), {
+    const res = await fetch(CONFIG.WORKER_URL + "/_control/status?_=" + Date.now(), {
       method: "GET",
     });
     const data = await res.json().catch(() => ({}));
@@ -402,9 +402,12 @@
       const data = await requestStatus();
       const progress = 25 + Math.min(65, Math.floor((elapsed / CONFIG.MAX_WAIT_MS) * 65));
 
-      if (data.ready && data.url) {
+      if (data.ready) {
         setLoaderMessage("¡Listo! Cargando el portal...", 100);
-        startSession(data.url);
+        // El iframe carga la raíz del propio Worker, que actúa como proxy
+        // inverso hacia el Codespace (evita la pantalla anti-phishing de
+        // Dev Tunnels y oculta por completo la URL real de app.github.dev).
+        startSession(CONFIG.WORKER_URL + "/");
         return;
       }
 
